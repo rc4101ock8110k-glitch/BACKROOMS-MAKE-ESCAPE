@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BACKROOMS: CREATE & ESCAPE</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090909;color:#eee;font-family:system-ui,-apple-system,sans-serif}
+canvas{display:block;width:100%;height:100%;touch-action:none;background:#111}
+#ui{position:fixed;inset:0;pointer-events:none}
+.panel{pointer-events:auto;background:rgba(10,10,10,.82);border:1px solid #555;border-radius:14px;padding:14px;backdrop-filter:blur(8px)}
+#top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px}
+button{border:1px solid #777;background:#1b1b1b;color:#fff;border-radius:10px;padding:10px 13px;font-size:14px}
+button:active{transform:scale(.97);background:#333}
+#mode{font-weight:700;letter-spacing:.08em}
+#creator{position:absolute;left:10px;right:10px;bottom:10px}
+.row{display:flex;flex-wrap:wrap;gap:7px}
+.small{font-size:12px;color:#bbb}
+#title{font-size:20px;font-weight:800;margin-bottom:6px}
+#menu{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at center,#222,#050505)}
+#menu .panel{width:min(92vw,430px);text-align:center}
+h1{margin:0 0 8px;font-size:28px}
+#mobile{position:absolute;inset:0;pointer-events:none}
+#stick{position:absolute;left:18px;bottom:90px;width:120px;height:120px;border:2px solid #888;border-radius:50%;background:#fff1}
+#knob{position:absolute;left:35px;top:35px;width:46px;height:46px;border-radius:50%;background:#fff5}
+#look{position:absolute;right:0;top:0;width:65%;height:75%;pointer-events:auto}
+#action{position:absolute;right:20px;bottom:105px;pointer-events:auto}
+#msg{position:absolute;left:50%;top:80px;transform:translateX(-50%);background:#000b;padding:8px 12px;border-radius:8px;display:none}
+input{width:100%;padding:10px;border-radius:9px;border:1px solid #666;background:#111;color:#fff}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="menu">
+    <div class="panel">
+      <h1>BACKROOMS</h1>
+      <div class="small" style="margin-bottom:18px">CREATE & ESCAPE — mobile prototype</div>
+      <button id="playBtn" style="width:100%;margin-bottom:8px">▶ PLAY</button>
+      <button id="createBtn" style="width:100%">＋ CREATE</button>
+      <div class="small" style="margin-top:14px">この試作品はスマホのブラウザだけで動作します。</div>
+    </div>
+  </div>
+  <div id="top" class="hidden">
+    <div class="panel" id="mode">PLAY</div>
+    <div class="row">
+      <button id="saveBtn">SAVE</button>
+      <button id="menuBtn">MENU</button>
+    </div>
+  </div>
+  <div id="creator" class="panel hidden">
+    <div id="title">Level Creator</div>
+    <div class="small">タップした位置にパーツを配置。SAVEで端末に保存できます。</div>
+    <div class="row" style="margin-top:9px">
+      <button data-tool="wall">🧱 壁</button>
+      <button data-tool="floor">▰ 床</button>
+      <button data-tool="light">💡 照明</button>
+      <button data-tool="door">🚪 ドア</button>
+      <button data-tool="entity">👤 Entity</button>
+      <button data-tool="key">🔑 鍵</button>
+      <button id="testBtn">▶ TEST</button>
+      <button id="clearBtn">CLEAR</button>
+    </div>
+  </div>
+  <div id="mobile" class="hidden">
+    <div id="stick"><div id="knob"></div></div>
+    <div id="look"></div>
+    <button id="action">USE</button>
+  </div>
+  <div id="msg"></div>
+</div>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W,H,dpr,mode='menu',tool='wall',objects=[],player={x:0,y:0,a:0},keys=0;
+function resize(){dpr=devicePixelRatio||1;W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}resize();addEventListener('resize',resize);
+
+function show(id,on){document.getElementById(id).classList.toggle('hidden',!on)}
+function msg(t){let e=document.getElementById('msg');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',1600)}
+function start(m){
+ mode=m; show('menu',false); show('top',true); show('mobile',true); show('creator',m==='create');
+ document.getElementById('mode').textContent=m==='create'?'CREATE':'PLAY';
+ if(m==='play'){load(); player={x:0,y:0,a:0};}
+}
+document.getElementById('playBtn').onclick=()=>start('play');
+document.getElementById('createBtn').onclick=()=>start('create');
+document.getElementById('menuBtn').onclick=()=>{mode='menu';show('menu',true);show('top',false);show('mobile',false);show('creator',false)};
+document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;msg('選択: '+tool)});
+document.getElementById('clearBtn').onclick=()=>{objects=[];msg('Levelをクリア')};
+document.getElementById('saveBtn').onclick=()=>{localStorage.setItem('br_level1',JSON.stringify(objects));msg('Levelを保存しました')};
+document.getElementById('testBtn').onclick=()=>{localStorage.setItem('br_level1',JSON.stringify(objects));start('play');msg('テストプレイ開始')};
+function load(){try{objects=JSON.parse(localStorage.getItem('br_level1'))||defaultLevel()}catch{objects=defaultLevel()}}
+function defaultLevel(){return [
+{x:180,y:150,w:500,h:18,t:'wall'},{x:180,y:450,w:500,h:18,t:'wall'},
+{x:180,y:150,w:18,h:318,t:'wall'},{x:680,y:150,w:18,h:318,t:'wall'},
+{x:360,y:270,w:18,h:180,t:'wall'},{x:520,y:150,w:18,h:90,t:'wall'},
+{x:260,y:205,w:30,h:30,t:'light'},{x:570,y:350,w:30,h:30,t:'light'},
+{x:610,y:410,w:32,h:32,t:'key'},{x:630,y:170,w:40,h:12,t:'door'},
+{x:470,y:350,w:25,h:25,t:'entity'}]}
+
+canvas.addEventListener('pointerdown',e=>{
+ if(mode!=='create')return;
+ const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+ const size={wall:[80,14],floor:[70,50],light:[26,26],door:[44,14],entity:[26,26],key:[20,20]}[tool]||[30,30];
+ objects.push({x:x-size[0]/2,y:y-size[1]/2,w:size[0],h:size[1],t:tool}); msg(tool+' を配置');
+});
+
+let joy={x:0,y:0},drag=false,lastX=0;
+const stick=document.getElementById('stick'),knob=document.getElementById('knob');
+stick.addEventListener('pointerdown',e=>{drag=true;stick.setPointerCapture(e.pointerId);moveJoy(e)});
+stick.addEventListener('pointermove',e=>{if(drag)moveJoy(e)});
+stick.addEventListener('pointerup',()=>{drag=false;joy={x:0,y:0};knob.style.transform='translate(0,0)'});
+function moveJoy(e){let r=stick.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),len=Math.hypot(dx,dy),max=38;if(len>max){dx=dx/len*max;dy=dy/len*max}joy={x:dx/max,y:dy/max};knob.style.transform=`translate(${dx}px,${dy}px)`}
+
+let look=document.getElementById('look');look.addEventListener('pointerdown',e=>{lastX=e.clientX});look.addEventListener('pointermove',e=>{if(e.buttons)player.a+=(e.clientX-lastX)*.006;lastX=e.clientX});
+
+function drawWorld(){
+ ctx.fillStyle='#171612';ctx.fillRect(0,0,W,H);
+ // fake first-person Backrooms perspective
+ const horizon=H*.46;
+ ctx.fillStyle='#8b8660';ctx.fillRect(0,horizon,W,H-horizon);
+ ctx.fillStyle='#b5ad7d';ctx.fillRect(0,0,W,horizon);
+ ctx.strokeStyle='#706b4e';ctx.lineWidth=2;
+ for(let i=-8;i<=8;i++){ctx.beginPath();ctx.moveTo(W/2+i*18,horizon);ctx.lineTo(W/2+i*90,H);ctx.stroke()}
+ for(let j=1;j<7;j++){let y=horizon+(H-horizon)*(j/7)**1.6;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ // walls
+ ctx.fillStyle='#d2cc96';ctx.fillRect(0,horizon-90,W,90);
+ ctx.fillStyle='#aaa477';
+ for(let i=0;i<10;i++){let x=(i*173-player.a*100)%W;ctx.fillRect(x,horizon-80,7,80)}
+ // lights
+ for(let i=0;i<5;i++){let x=(i+1)*W/6;ctx.fillStyle='#fff7c4';ctx.fillRect(x-35,30,70,8)}
+ if(keys===0){ctx.fillStyle='#000b';ctx.fillRect(W/2-75,H*.68,150,34);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='14px system-ui';ctx.fillText('鍵を探して出口へ',W/2,H*.68+22)}
+}
+function drawCreate(){
+ ctx.fillStyle='#161616';ctx.fillRect(0,0,W,H);
+ ctx.save();ctx.translate(W/2-430,H/2-300);
+ ctx.fillStyle='#242424';ctx.fillRect(0,0,860,600);
+ for(const o of objects){
+  if(o.t==='wall'){ctx.fillStyle='#d0c98f';ctx.fillRect(o.x,o.y,o.w,o.h)}
+  else if(o.t==='floor'){ctx.fillStyle='#817b58';ctx.fillRect(o.x,o.y,o.w,o.h)}
+  else if(o.t==='light'){ctx.fillStyle='#fff4a8';ctx.fillRect(o.x,o.y,o.w,o.h)}
+  else if(o.t==='door'){ctx.fillStyle='#4b3b2b';ctx.fillRect(o.x,o.y,o.w,o.h)}
+  else if(o.t==='entity'){ctx.fillStyle='#111';ctx.beginPath();ctx.arc(o.x+o.w/2,o.y+o.h/2,o.w/2,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f33';ctx.fillRect(o.x+6,o.y+8,4,4);ctx.fillRect(o.x+16,o.y+8,4,4)}
+  else if(o.t==='key'){ctx.strokeStyle='#ffd84d';ctx.lineWidth=4;ctx.beginPath();ctx.arc(o.x+7,o.y+8,6,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(o.x+12,o.y+12);ctx.lineTo(o.x+19,o.y+19);ctx.stroke()}
+ }
+ ctx.restore();
+}
+function loop(){
+ if(mode==='play')drawWorld(); else if(mode==='create')drawCreate(); else {ctx.fillStyle='#050505';ctx.fillRect(0,0,W,H)}
+ if(mode==='play'){
+  player.x+=joy.x*1.7; player.y+=joy.y*1.7;
+  // simple encounter simulation
+  if(objects.some(o=>o.t==='entity') && Math.random()<.002)msg('何かがこちらを見ている……');
+ }
+ requestAnimationFrame(loop)
+}loop();
+</script>
+</body></html>
