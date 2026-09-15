@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>BACKROOMS: CREATE & ESCAPE</title>
+<style>
+*{box-sizing:border-box}
+html,body{
+  margin:0;width:100%;height:100%;overflow:hidden;
+  background:#080808;color:#eee;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  touch-action:none;
+}
+canvas{
+  display:block;width:100%;height:100%;
+  background:#111;touch-action:none;
+}
+#ui{position:fixed;inset:0;pointer-events:none}
+button{
+  border:1px solid #777;background:#1b1b1b;color:#fff;border-radius:10px;
+  padding:10px 13px;font-size:14px;font-weight:600;
+  -webkit-tap-highlight-color:transparent;
+}
+button:active{transform:scale(.97);background:#333}
+.panel{
+  pointer-events:auto;background:rgba(8,8,8,.86);
+  border:1px solid #555;border-radius:14px;padding:14px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.hidden{display:none!important}
+.row{display:flex;flex-wrap:wrap;gap:7px}
+.small{font-size:12px;color:#bbb}
+#menu{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at center,#25251f,#050505);
+  pointer-events:auto;
+}
+#menu .panel{width:min(92vw,430px);text-align:center}
+h1{margin:0 0 8px;font-size:29px}
+#top{
+  position:absolute;top:max(10px,env(safe-area-inset-top));left:10px;right:10px;
+  display:flex;justify-content:space-between;gap:8px;align-items:flex-start;
+}
+#mode{font-weight:800;letter-spacing:.08em}
+#stats{
+  position:absolute;top:67px;left:10px;background:#000b;padding:8px 10px;
+  border-radius:9px;font-size:13px;display:none;
+}
+#creator{
+  position:absolute;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));
+}
+#title{font-size:20px;font-weight:800;margin-bottom:5px}
+#mobile{position:absolute;inset:0;pointer-events:none}
+#stick{
+  position:absolute;left:18px;bottom:max(95px,calc(95px + env(safe-area-inset-bottom)));
+  width:140px;height:140px;border:2px solid #aaa;border-radius:50%;
+  background:rgba(255,255,255,.10);pointer-events:auto;touch-action:none;z-index:20;
+}
+#knob{
+  position:absolute;left:47px;top:47px;width:46px;height:46px;border-radius:50%;
+  background:rgba(255,255,255,.48);pointer-events:none;
+}
+#look{
+  position:absolute;right:0;top:0;width:62%;height:75%;
+  pointer-events:auto;touch-action:none;z-index:10;
+}
+#action{
+  position:absolute;right:20px;bottom:max(105px,calc(105px + env(safe-area-inset-bottom)));
+  pointer-events:auto;border-radius:50%;width:72px;height:72px;
+  font-weight:800;z-index:21;background:rgba(20,20,20,.78);
+}
+#cross{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:24px;color:#fff9;display:none;text-shadow:0 1px 4px #000;
+}
+#msg{
+  position:absolute;left:50%;top:82px;transform:translateX(-50%);
+  background:#000d;padding:9px 13px;border-radius:9px;display:none;
+  white-space:nowrap;max-width:90vw;text-align:center;
+}
+#result{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#000b;pointer-events:auto;
+}
+#result .panel{width:min(90vw,390px);text-align:center}
+#hint{
+  position:absolute;left:50%;bottom:20px;transform:translateX(-50%);
+  color:#fff8;font-size:12px;text-align:center;pointer-events:none;
+  white-space:nowrap;
+}
+@media(min-width:800px){
+  #mobile{display:none!important}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="menu">
+    <div class="panel">
+      <h1>BACKROOMS</h1>
+      <div class="small" style="margin-bottom:18px">CREATE & ESCAPE</div>
+      <button id="playBtn" style="width:100%;margin-bottom:8px">▶ PLAY</button>
+      <button id="createBtn" style="width:100%">＋ CREATE</button>
+      <div class="small" style="margin-top:14px">3つの鍵を集めて出口へ。Entityに捕まるな。</div>
+    </div>
+  </div>
+
+  <div id="top" class="hidden">
+    <div class="panel" id="mode">PLAY</div>
+    <div class="row">
+      <button id="saveBtn">SAVE</button>
+      <button id="menuBtn">MENU</button>
+    </div>
+  </div>
+
+  <div id="stats"></div>
+
+  <div id="creator" class="panel hidden">
+    <div id="title">Level Creator</div>
+    <div class="small">パーツを選んでマップをタップ。SAVEで保存できます。</div>
+    <div class="row" style="margin-top:9px">
+      <button data-tool="wall">🧱 壁</button>
+      <button data-tool="floor">▰ 床</button>
+      <button data-tool="light">💡 照明</button>
+      <button data-tool="door">🚪 出口</button>
+      <button data-tool="entity">👤 Entity</button>
+      <button data-tool="key">🔑 鍵</button>
+      <button data-tool="start">🟢 START</button>
+      <button id="testBtn">▶ TEST</button>
+      <button id="clearBtn">CLEAR</button>
+    </div>
+  </div>
+
+  <div id="mobile" class="hidden">
+    <div id="stick"><div id="knob"></div></div>
+    <div id="look"></div>
+    <button id="action">USE</button>
+    <div id="cross">＋</div>
+  </div>
+
+  <div id="hint" class="hidden">左：移動　右：視点　USE：鍵・出口</div>
+  <div id="msg"></div>
+
+  <div id="result" class="hidden">
+    <div class="panel">
+      <div id="resultTitle" style="font-size:30px;font-weight:900"></div>
+      <div id="resultText" class="small" style="margin:10px 0 18px"></div>
+      <button id="retryBtn" style="width:100%;margin-bottom:8px">もう一度</button>
+      <button id="resultMenuBtn" style="width:100%">MENU</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
+
+let W=innerWidth,H=innerHeight,dpr=1;
+let mode="menu",tool="wall",objects=[];
+let player={x:100,y:100,a:0};
+let keys=0,gameStart=0,gameOver=false,entityTimer=0,lastTime=0;
+
+const WORLD={w:860,h:600};
+const FOV=Math.PI*70/180;
+const RAYS=280;
+const MOVE_SPEED=115;
+const TURN_SPEED=.0038;
+
+function resize(){
+  dpr=Math.min(devicePixelRatio||1,2);
+  W=innerWidth; H=innerHeight;
+  canvas.width=Math.floor(W*dpr);
+  canvas.height=Math.floor(H*dpr);
+  canvas.style.width=W+"px";
+  canvas.style.height=H+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+resize();
+addEventListener("resize",resize);
+
+function show(id,on){
+  document.getElementById(id).classList.toggle("hidden",!on);
+}
+function msg(t){
+  const e=document.getElementById("msg");
+  e.textContent=t;e.style.display="block";
+  clearTimeout(msg.tm);
+  msg.tm=setTimeout(()=>e.style.display="none",1700);
+}
+
+function defaultLevel(){
+  return [
+    {x:50,y:40,w:760,h:18,t:"wall"},
+    {x:50,y:542,w:760,h:18,t:"wall"},
+    {x:50,y:40,w:18,h:520,t:"wall"},
+    {x:792,y:40,w:18,h:520,t:"wall"},
+
+    {x:275,y:40,w:18,h:180,t:"wall"},
+    {x:505,y:250,w:18,h:310,t:"wall"},
+    {x:155,y:250,w:138,h:18,t:"wall"},
+    {x:600,y:165,w:192,h:18,t:"wall"},
+
+    {x:120,y:105,w:28,h:28,t:"light"},
+    {x:680,y:450,w:28,h:28,t:"light"},
+    {x:395,y:390,w:28,h:28,t:"light"},
+
+    {x:700,y:80,w:50,h:18,t:"door"},
+    {x:205,y:445,w:20,h:20,t:"key"},
+    {x:670,y:345,w:20,h:20,t:"key"},
+    {x:390,y:130,w:20,h:20,t:"key"},
+
+    {x:440,y:300,w:28,h:28,t:"entity"},
+    {x:100,y:90,w:22,h:22,t:"start"}
+  ];
+}
+
+function save(){
+  localStorage.setItem("br_level1",JSON.stringify(objects));
+  msg("Levelを保存しました");
+}
+
+function load(){
+  try{
+    const s=localStorage.getItem("br_level1");
+    objects=s?JSON.parse(s):defaultLevel();
+    if(!Array.isArray(objects)||!objects.length)objects=defaultLevel();
+  }catch(e){
+    objects=defaultLevel();
+  }
+}
+
+function loadCreator(){
+  try{
+    const s=localStorage.getItem("br_level1");
+    const a=s?JSON.parse(s):defaultLevel();
+    return Array.isArray(a)&&a.length?a:defaultLevel();
+  }catch(e){return defaultLevel();}
+}
+
+function start(m){
+  mode=m;gameOver=false;keys=0;entityTimer=0;
+  show("menu",false);
+  show("top",true);
+  show("mobile",m==="play");
+  show("creator",m==="create");
+  show("result",false);
+  show("hint",m==="play");
+  document.getElementById("mode").textContent=m==="create"?"CREATE":"PLAY";
+  document.getElementById("stats").style.display=m==="play"?"block":"none";
+
+  if(m==="play"){
+    load();
+    const s=objects.find(o=>o.t==="start");
+    player={
+      x:s?s.x+s.w/2:100,
+      y:s?s.y+s.h/2:100,
+      a:0
+    };
+    gameStart=performance.now();
+    lastTime=gameStart;
+    resetJoy();
+  }
+}
+
+function goMenu(){
+  mode="menu";
+  show("menu",true);
+  show("top",false);
+  show("mobile",false);
+  show("creator",false);
+  show("result",false);
+  show("hint",false);
+  document.getElementById("stats").style.display="none";
+  resetJoy();
+}
+
+document.getElementById("playBtn").onclick=()=>start("play");
+
+document.getElementById("createBtn").onclick=()=>{
+  objects=loadCreator();
+  start("create");
+};
+
+document.getElementById("menuBtn").onclick=goMenu;
+document.getElementById("saveBtn").onclick=save;
+
+document.getElementById("clearBtn").onclick=()=>{
+  objects=[];
+  msg("Levelをクリア");
+};
+
+document.querySelectorAll("[data-tool]").forEach(b=>{
+  b.onclick=()=>{
+    tool=b.dataset.tool;
+    msg("選択: "+tool);
+  };
+});
+
+document.getElementById("testBtn").onclick=()=>{
+  save();
+  start("play");
+  msg("テストプレイ開始");
+};
+
+function screenToWorld(clientX,clientY){
+  const r=canvas.getBoundingClientRect();
+  const ox=(W-WORLD.w)/2;
+  const oy=(H-WORLD.h)/2;
+  return {
+    x:(clientX-r.left)-ox,
+    y:(clientY-r.top)-oy
+  };
+}
+
+let creatorPointer=null;
+
+canvas.addEventListener("pointerdown",e=>{
+  if(mode!=="create")return;
+  e.preventDefault();
+  const p=screenToWorld(e.clientX,e.clientY);
+  if(p.x<0||p.y<0||p.x>WORLD.w||p.y>WORLD.h)return;
+
+  const size={
+    wall:[80,16],floor:[70,50],light:[28,28],
+    door:[50,18],entity:[28,28],key:[20,20],start:[22,22]
+  }[tool]||[30,30];
+
+  if(tool==="start"){
+    objects=objects.filter(o=>o.t!=="start");
+  }
+
+  objects.push({
+    x:p.x-size[0]/2,
+    y:p.y-size[1]/2,
+    w:size[0],
+    h:size[1],
+    t:tool
+  });
+  msg(tool+" を配置");
+});
+
+let joy={x:0,y:0};
+let draggingJoy=false;
+const stick=document.getElementById("stick");
+const knob=document.getElementById("knob");
+
+function moveJoy(e){
+  e.preventDefault();
+  const r=stick.getBoundingClientRect();
+  let dx=e.clientX-(r.left+r.width/2);
+  let dy=e.clientY-(r.top+r.height/2);
+  const max=42;
+  const len=Math.hypot(dx,dy);
+
+  if(len>max){
+    dx=dx/len*max;
+    dy=dy/len*max;
+  }
+
+  joy.x=dx/max;
+  joy.y=dy/max;
+  knob.style.transform=`translate(${dx}px,${dy}px)`;
+}
+
+function resetJoy(){
+  draggingJoy=false;
+  joy.x=0;joy.y=0;
+  if(knob)knob.style.transform="translate(0,0)";
+}
+
+stick.addEventListener("pointerdown",e=>{
+  if(mode!=="play")return;
+  e.preventDefault();
+  draggingJoy=true;
+  stick.setPointerCapture(e.pointerId);
+  moveJoy(e);
+});
+stick.addEventListener("pointermove",e=>{
+  if(!draggingJoy)return;
+  moveJoy(e);
+});
+stick.addEventListener("pointerup",e=>{
+  e.preventDefault();
+  resetJoy();
+});
+stick.addEventListener("pointercancel",resetJoy);
+stick.addEventListener("lostpointercapture",resetJoy);
+
+let lookActive=false,lastLookX=0;
+const look=document.getElementById("look");
+
+look.addEventListener("pointerdown",e=>{
+  if(mode!=="play")return;
+  e.preventDefault();
+  lookActive=true;
+  lastLookX=e.clientX;
+  try{look.setPointerCapture(e.pointerId)}catch{}
+});
+look.addEventListener("pointermove",e=>{
+  if(!lookActive||mode!=="play")return;
+  e.preventDefault();
+  player.a+=(e.clientX-lastLookX)*TURN_SPEED;
+  lastLookX=e.clientX;
+});
+look.addEventListener("pointerup",e=>{
+  lookActive=false;
+  try{look.releasePointerCapture(e.pointerId)}catch{}
+});
+look.addEventListener("pointercancel",()=>lookActive=false);
+
+document.getElementById("action").onclick=useAction;
+
+const keyboard={};
+addEventListener("keydown",e=>{
+  keyboard[e.key.toLowerCase()]=true;
+});
+addEventListener("keyup",e=>{
+  keyboard[e.key.toLowerCase()]=false;
+});
+
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+
+function rectHitCircle(o,x,y,r=12){
+  const cx=Math.max(o.x,Math.min(x,o.x+o.w));
+  const cy=Math.max(o.y,Math.min(y,o.y+o.h));
+  return (x-cx)**2+(y-cy)**2<r*r;
+}
+
+function blocked(x,y){
+  if(x<62||x>798||y<52||y>548)return true;
+  for(const o of objects){
+    if(o.t==="wall"&&rectHitCircle(o,x,y,13))return true;
+  }
+  return false;
+}
+
+function tryMove(dx,dy){
+  const nx=player.x+dx;
+  const ny=player.y+dy;
+
+  if(!blocked(nx,player.y))player.x=nx;
+  if(!blocked(player.x,ny))player.y=ny;
+}
+
+function useAction(){
+  if(mode!=="play"||gameOver)return;
+
+  let nearest=null,best=999;
+  for(const o of objects){
+    if(o.t!=="key"&&o.t!=="door")continue;
+    const d=dist(player,{x:o.x+o.w/2,y:o.y+o.h/2});
+    if(d<55&&d<best){best=d;nearest=o;}
+  }
+
+  if(nearest&&nearest.t==="key"){
+    const i=objects.indexOf(nearest);
+    if(i>=0)objects.splice(i,1);
+    keys++;
+    msg("🔑 鍵を手に入れた！ "+keys+"/3");
+    return;
+  }
+
+  if(nearest&&nearest.t==="door"){
+    if(keys>=3)win();
+    else msg("🔒 鍵が足りない…… "+keys+"/3");
+    return;
+  }
+
+  msg("何もない……");
+}
+
+function win(){
+  gameOver=true;
+  showResult("ESCAPED!","Backroomsから脱出した。時間: "+((performance.now()-gameStart)/1000).toFixed(1)+"秒");
+}
+
+function lose(){
+  gameOver=true;
+  showResult("CAUGHT","Entityに捕まった……");
+}
+
+function showResult(t,sub){
+  document.getElementById("resultTitle").textContent=t;
+  document.getElementById("resultText").textContent=sub;
+  show("result",true);
+  resetJoy();
+}
+
+document.getElementById("retryBtn").onclick=()=>start("play");
+document.getElementById("resultMenuBtn").onclick=goMenu;
+
+function update(dt){
+  if(mode!=="play"||gameOver)return;
+
+  let mx=joy.x;
+  let my=joy.y;
+
+  if(keyboard["w"]||keyboard["arrowup"])my=-1;
+  if(keyboard["s"]||keyboard["arrowdown"])my=1;
+  if(keyboard["a"]||keyboard["arrowleft"])mx=-1;
+  if(keyboard["d"]||keyboard["arrowright"])mx=1;
+
+  const mag=Math.hypot(mx,my);
+  if(mag>1){mx/=mag;my/=mag}
+
+  const forward=-my;
+  const strafe=mx;
+
+  const speed=MOVE_SPEED*dt;
+  const dx=(Math.cos(player.a)*forward+Math.cos(player.a+Math.PI/2)*strafe)*speed;
+  const dy=(Math.sin(player.a)*forward+Math.sin(player.a+Math.PI/2)*strafe)*speed;
+
+  tryMove(dx,dy);
+
+  if(keyboard["q"])player.a-=2.2*dt;
+  if(keyboard["e"])player.a+=2.2*dt;
+
+  entityTimer=(performance.now()-gameStart)/1000;
+
+  const e=objects.find(o=>o.t==="entity");
+  if(e){
+    const ex=e.x+e.w/2,ey=e.y+e.h/2;
+    const dxp=player.x-ex,dyp=player.y-ey;
+    const d=Math.hypot(dxp,dyp);
+
+    if(entityTimer>4&&d<330){
+      const es=29*dt;
+      const nx=ex+dxp/Math.max(d,1)*es;
+      const ny=ey+dyp/Math.max(d,1)*es;
+      if(!blocked(nx,ey))e.x+=nx-ex;
+      if(!blocked(e.x,ny))e.y+=ny-ey;
+      if(d<25)lose();
+    }
+  }
+
+  for(let i=objects.length-1;i>=0;i--){
+    const o=objects[i];
+    if(o.t==="key"&&dist(player,{x:o.x+o.w/2,y:o.y+o.h/2})<20){
+      objects.splice(i,1);
+      keys++;
+      msg("🔑 鍵を入手！ "+keys+"/3");
+    }
+  }
+
+  const door=objects.find(o=>o.t==="door");
+  if(door&&dist(player,{x:door.x+door.w/2,y:door.y+door.h/2})<27&&keys>=3){
+    win();
+  }
+
+  document.getElementById("stats").textContent=
+    `🔑 ${keys}/3　⏱ ${entityTimer.toFixed(0)}s`;
+}
+
+function rayRect(px,py,dx,dy,o){
+  let tmin=-Infinity,tmax=Infinity;
+
+  if(Math.abs(dx)<1e-9){
+    if(px<o.x||px>o.x+o.w)return Infinity;
+  }else{
+    let tx1=(o.x-px)/dx,tx2=(o.x+o.w-px)/dx;
+    if(tx1>tx2){const t=tx1;tx1=tx2;tx2=t}
+    tmin=Math.max(tmin,tx1);
+    tmax=Math.min(tmax,tx2);
+  }
+
+  if(Math.abs(dy)<1e-9){
+    if(py<o.y||py>o.y+o.h)return Infinity;
+  }else{
+    let ty1=(o.y-py)/dy,ty2=(o.y+o.h-py)/dy;
+    if(ty1>ty2){const t=ty1;ty1=ty2;ty2=t}
+    tmin=Math.max(tmin,ty1);
+    tmax=Math.min(tmax,ty2);
+  }
+
+  if(tmax>=Math.max(tmin,0))return Math.max(tmin,0);
+  return Infinity;
+}
+
+function wallAtRay(angle){
+  const dx=Math.cos(angle),dy=Math.sin(angle);
+  let best=Infinity,bestObj=null;
+
+  for(const o of objects){
+    if(o.t!=="wall")continue;
+    const t=rayRect(player.x,player.y,dx,dy,o);
+    if(t>0&&t<best){best=t;bestObj=o}
+  }
+
+  return {dist:best,obj:bestObj};
+}
+
+function angleDiff(a,b){
+  let d=a-b;
+  while(d>Math.PI)d-=Math.PI*2;
+  while(d<-Math.PI)d+=Math.PI*2;
+  return d;
+}
+
+function drawBackground(){
+  const horizon=H*.46;
+
+  const ceil=ctx.createLinearGradient(0,0,0,horizon);
+  ceil.addColorStop(0,"#b9b27d");
+  ceil.addColorStop(1,"#d5ce98");
+  ctx.fillStyle=ceil;
+  ctx.fillRect(0,0,W,horizon);
+
+  const floor=ctx.createLinearGradient(0,horizon,0,H);
+  floor.addColorStop(0,"#77704f");
+  floor.addColorStop(1,"#4e4a37");
+  ctx.fillStyle=floor;
+  ctx.fillRect(0,horizon,W,H-horizon);
+
+  // Ceiling lights
+  const flick=Math.sin(performance.now()/160)>-.88;
+  for(let i=0;i<6;i++){
+    const x=(i+.5)*W/6;
+    ctx.fillStyle=flick?"#fff7c5":"#625e42";
+    ctx.fillRect(x-32,28,64,8);
+    ctx.fillStyle=flick?"rgba(255,245,170,.08)":"rgba(0,0,0,.04)";
+    ctx.fillRect(x-55,36,110,30);
+  }
+}
+
+function drawWorld(){
+  drawBackground();
+
+  const horizon=H*.46;
+  const stripW=W/RAYS;
+  const depths=new Float32Array(RAYS);
+
+  for(let i=0;i<RAYS;i++){
+    const camera=(i/(RAYS-1)-.5)*FOV;
+    const angle=player.a+camera;
+    const hit=wallAtRay(angle);
+
+    let d=hit.dist;
+    if(!isFinite(d))d=1000;
+
+    // fish-eye correction
+    d*=Math.cos(camera);
+    depths[i]=d;
+
+    const wallH=Math.min(H*1.8,62000/Math.max(d,1));
+    const y=horizon-wallH/2;
+
+    let shade=Math.max(.22,1-d/650);
+    let r=Math.floor(196*shade);
+    let g=Math.floor(188*shade);
+    let b=Math.floor(137*shade);
+
+    if(hit.obj){
+      // Slightly vary wall shading by surface position
+      const side=Math.abs(Math.cos(angle))>.7;
+      if(side){r*=.92;g*=.92;b*=.92}
+    }
+
+    ctx.fillStyle=`rgb(${r|0},${g|0},${b|0})`;
+    ctx.fillRect(i*stripW,y,stripW+1,wallH);
+
+    // dark lower edge
+    ctx.fillStyle=`rgba(35,30,20,${Math.min(.42,d/700)})`;
+    ctx.fillRect(i*stripW,y+wallH*.88,stripW+1,wallH*.12);
+  }
+
+  drawSprites(depths);
+}
+
+function drawSprites(depths){
+  const sprites=[];
+
+  for(const o of objects){
+    if(o.t!=="key"&&o.t!=="door"&&o.t!=="entity")continue;
+
+    const sx=o.x+o.w/2,sy=o.y+o.h/2;
+    const dx=sx-player.x,dy=sy-player.y;
+    const d=Math.hypot(dx,dy);
+    const ang=Math.atan2(dy,dx);
+    const rel=angleDiff(ang,player.a);
+
+    if(Math.abs(rel)>FOV/2+.35||d<8)continue;
+
+    const screenX=W/2+Math.tan(rel)/(Math.tan(FOV/2))*(W/2);
+    const size=Math.min(H*1.1,5000/d);
+    const rayIndex=Math.floor(Math.max(0,Math.min(RAYS-1,
+      (screenX/W+.0)*RAYS
+    )));
+    const wallD=depths[rayIndex]||999;
+
+    sprites.push({o,d,screenX,size,visible:d<wallD+10});
+  }
+
+  sprites.sort((a,b)=>b.d-a.d);
+
+  for(const s of sprites){
+    if(!s.visible)continue;
+
+    const o=s.o;
+    const x=s.screenX;
+    const base=H*.46+s.size*.5;
+
+    if(o.t==="entity"){
+      const sz=Math.max(16,s.size*.34);
+      const top=H*.46-sz*.65;
+
+      ctx.save();
+      ctx.translate(x,top);
+
+      ctx.fillStyle="rgba(0,0,0,.92)";
+      ctx.beginPath();
+      ctx.arc(0,sz*.3,sz*.34,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillRect(-sz*.32,sz*.58,sz*.64,sz*1.0);
+
+      ctx.fillStyle="#e22";
+      ctx.fillRect(-sz*.14,sz*.23,sz*.08,sz*.08);
+      ctx.fillRect(sz*.06,sz*.23,sz*.08,sz*.08);
+
+      ctx.restore();
+    }
+
+    if(o.t==="key"){
+      const sz=Math.max(12,s.size*.24);
+      const y=H*.46-sz*.5;
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(Math.sin(performance.now()/250)*.15);
+      ctx.strokeStyle="#ffe06a";
+      ctx.lineWidth=Math.max(2,sz*.12);
+      ctx.beginPath();
+      ctx.arc(-sz*.25,0,sz*.22,0,Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-sz*.03,0);
+      ctx.lineTo(sz*.5,sz*.25);
+      ctx.lineTo(sz*.67,sz*.08);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if(o.t==="door"){
+      const dw=Math.max(24,s.size*.38);
+      const dh=Math.max(40,s.size*.9);
+      const y=H*.46-dh*.55;
+      ctx.fillStyle="#5d3927";
+      ctx.fillRect(x-dw/2,y,dw,dh);
+      ctx.strokeStyle="#c39a62";
+      ctx.lineWidth=2;
+      ctx.strokeRect(x-dw/2,y,dw,dh);
+      ctx.fillStyle="#111";
+      ctx.fillRect(x+dw*.2,y+dh*.52,4,4);
+      ctx.fillStyle="#ddd";
+      ctx.font=Math.max(9,dw*.18)+"px sans-serif";
+      ctx.textAlign="center";
+      ctx.fillText("EXIT",x,y+dh*.25);
+    }
+  }
+
+  // Vignette
+  const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.2,W/2,H/2,Math.max(W,H)*.72);
+  vg.addColorStop(0,"rgba(0,0,0,0)");
+  vg.addColorStop(1,"rgba(0,0,0,.48)");
+  ctx.fillStyle=vg;
+  ctx.fillRect(0,0,W,H);
+
+  if(entityTimer>4&&objects.some(o=>o.t==="entity")){
+    const pulse=Math.max(0,1-Math.min(entityTimer/20,1));
+    ctx.fillStyle=`rgba(110,0,0,${.025+.06*pulse})`;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+function drawCreate(){
+  ctx.fillStyle="#121212";
+  ctx.fillRect(0,0,W,H);
+
+  const ox=(W-WORLD.w)/2;
+  const oy=(H-WORLD.h)/2;
+
+  ctx.save();
+  ctx.translate(ox,oy);
+
+  ctx.fillStyle="#8b8660";
+  ctx.fillRect(0,0,WORLD.w,WORLD.h);
+
+  ctx.strokeStyle="#77704e";
+  ctx.lineWidth=1;
+
+  for(let x=0;x<WORLD.w;x+=40){
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,WORLD.h);ctx.stroke();
+  }
+  for(let y=0;y<WORLD.h;y+=40){
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(WORLD.w,y);ctx.stroke();
+  }
+
+  for(const o of objects){
+    if(o.t==="wall"){
+      ctx.fillStyle="#343126";ctx.fillRect(o.x,o.y,o.w,o.h);
+    }else if(o.t==="floor"){
+      ctx.fillStyle="#69634a";ctx.fillRect(o.x,o.y,o.w,o.h);
+    }else if(o.t==="light"){
+      ctx.fillStyle="#fff3a0";ctx.fillRect(o.x,o.y,o.w,o.h);
+    }else if(o.t==="door"){
+      ctx.fillStyle="#70452d";ctx.fillRect(o.x,o.y,o.w,o.h);
+      ctx.fillStyle="#fff";ctx.font="11px sans-serif";ctx.fillText("EXIT",o.x+5,o.y+13);
+    }else if(o.t==="entity"){
+      ctx.fillStyle="#090909";
+      ctx.beginPath();
+      ctx.arc(o.x+o.w/2,o.y+o.h/2,o.w/2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#f33";
+      ctx.fillRect(o.x+6,o.y+8,4,4);ctx.fillRect(o.x+18,o.y+8,4,4);
+    }else if(o.t==="key"){
+      ctx.strokeStyle="#ffe06a";ctx.lineWidth=4;
+      ctx.beginPath();ctx.arc(o.x+7,o.y+8,6,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(o.x+12,o.y+13);ctx.lineTo(o.x+19,o.y+19);ctx.stroke();
+    }else if(o.t==="start"){
+      ctx.fillStyle="#36d477";
+      ctx.beginPath();ctx.arc(o.x+o.w/2,o.y+o.h/2,10,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  ctx.strokeStyle="#fff8";
+  ctx.lineWidth=3;
+  ctx.strokeRect(0,0,WORLD.w,WORLD.h);
+  ctx.restore();
+}
+
+function loop(t){
+  const dt=Math.min(Math.max((t-lastTime)/1000,0),.05);
+  lastTime=t;
+
+  update(dt);
+
+  if(mode==="play")drawWorld();
+  else if(mode==="create")drawCreate();
+  else{
+    ctx.fillStyle="#050505";
+    ctx.fillRect(0,0,W,H);
+  }
+
+  requestAnimationFrame(loop);
+}
+
+load();
+requestAnimationFrame(t=>{
+  lastTime=t;
+  loop(t);
+});
+</script>
+</body>
+</html>
